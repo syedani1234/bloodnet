@@ -1,0 +1,12 @@
+.git
+.gitignore
+README.md
+.env.example
+.DS_Store
+node_modules
+.next
+out
+dist
+coverage
+.eslintignore
+*.log
