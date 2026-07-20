@@ -1,15 +1,16 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useToast } from '@/hooks/use-toast'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { BloodBadge } from '@/components/blood-badge'
 import { User, Heart, MapPin, Calendar, TrendingUp, Award, CheckCircle, AlertCircle } from 'lucide-react'
-import { useToast } from '@/hooks/use-toast'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
 import { DonationRecord } from '@/lib/donation-types'
+import { getDonationFlowState } from '@/lib/donation-flow-state'
 import dynamic from 'next/dynamic'
 
 const KarachiBloodRequestMap = dynamic(
@@ -436,41 +437,103 @@ export default function DonorDashboard({ user }: DonorDashboardProps) {
                           </span>
                         </div>
                       </div>
-                      {donation.status === 'verified' && (
-                        <Button
-                          onClick={async () => {
-                            try {
-                              const res = await fetch('/api/donations/certificate', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                  donorName: user.name,
-                                  bloodGroup: donation.bloodGroup,
-                                  hospitalName: donation.hospitalName,
-                                  donationDate: new Date(donation.donationDate || donation.communicationDate || new Date().toISOString()).toLocaleDateString(),
-                                  donationId: donation.id,
-                                }),
-                              })
-                              if (res.ok) {
-                                const blob = await res.blob()
-                                const url = window.URL.createObjectURL(blob)
-                                const a = document.createElement('a')
-                                a.href = url
-                                a.download = `BloodNet_Certificate_${user.name.replace(/\s+/g, '_')}.pdf`
-                                document.body.appendChild(a)
-                                a.click()
-                                document.body.removeChild(a)
-                                window.URL.revokeObjectURL(url)
+                      <div className="flex flex-col gap-2">
+                        {(() => {
+                          const flow = getDonationFlowState(
+                            donation.status || 'pending',
+                            Boolean(donation.status === 'submitted' || donation.status === 'receiver_confirmed' || donation.status === 'completed'),
+                            Boolean(donation.recipientConfirmed || donation.status === 'receiver_confirmed' || donation.status === 'completed')
+                          )
+
+                          return (
+                            <>
+                              {flow.canConfirmDonor && (
+                                <Button
+                                  onClick={() => {
+                                    void (async () => {
+                                      try {
+                                        const res = await fetch(`/api/donations/${donation.id}/donor-confirm`, {
+                                          method: 'PATCH',
+                                          headers: { 'Content-Type': 'application/json' },
+                                          body: JSON.stringify({ donorId: user.id, donorName: user.name, city: user.city }),
+                                        })
+                                        const payload = await res.json()
+                                        if (!res.ok || !payload.success) {
+                                          throw new Error(payload.error || 'Failed to confirm donation')
+                                        }
+                                        toast({ title: 'Donation confirmed', description: 'Waiting for receiver confirmation before admin approval.', variant: 'default' })
+                                        window.location.reload()
+                                      } catch (err) {
+                                        toast({ title: 'Confirmation failed', description: err instanceof Error ? err.message : 'Please try again.', variant: 'destructive' })
+                                      }
+                                    })()
+                                  }}
+                                  className="px-3 py-2 bg-green-600 text-white text-sm font-semibold rounded-lg hover:bg-green-700 transition-colors flex-shrink-0"
+                                >
+                                  Confirm Donated
+                                </Button>
+                              )}
+                              {flow.canApprove && (
+                                <Button
+                                  onClick={async () => {
+                                    try {
+                                      const res = await fetch(`/api/admin/donations/${donation.id}/approve?city=${encodeURIComponent(user.city)}`, {
+                                        method: 'PATCH',
+                                      })
+                                      const payload = await res.json()
+                                      if (!res.ok || !payload.success) {
+                                        throw new Error(payload.error || 'Failed to approve donation')
+                                      }
+                                      toast({ title: 'Donation approved', description: 'Certificate generated successfully.', variant: 'default' })
+                                      window.location.reload()
+                                    } catch (err) {
+                                      toast({ title: 'Approval failed', description: err instanceof Error ? err.message : 'Please try again.', variant: 'destructive' })
+                                    }
+                                  }}
+                                  className="px-3 py-2 bg-primary text-white text-sm font-semibold rounded-lg hover:bg-primary/90 transition-colors flex-shrink-0"
+                                >
+                                  Approve & Issue Certificate
+                                </Button>
+                              )}
+                            </>
+                          )
+                        })()}
+                        {donation.status === 'verified' && (
+                          <Button
+                            onClick={async () => {
+                              try {
+                                const res = await fetch('/api/donations/certificate', {
+                                  method: 'POST',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({
+                                    donorName: user.name,
+                                    bloodGroup: donation.bloodGroup,
+                                    hospitalName: donation.hospitalName,
+                                    donationDate: new Date(donation.donationDate || donation.communicationDate || new Date().toISOString()).toLocaleDateString(),
+                                    donationId: donation.id,
+                                  }),
+                                })
+                                if (res.ok) {
+                                  const blob = await res.blob()
+                                  const url = window.URL.createObjectURL(blob)
+                                  const a = document.createElement('a')
+                                  a.href = url
+                                  a.download = `BloodNet_Certificate_${user.name.replace(/\s+/g, '_')}.pdf`
+                                  document.body.appendChild(a)
+                                  a.click()
+                                  document.body.removeChild(a)
+                                  window.URL.revokeObjectURL(url)
+                                }
+                              } catch (err) {
+                                  toast({ title: 'Download failed', description: 'Failed to download certificate', variant: 'destructive' })
                               }
-                            } catch (err) {
-                                toast({ title: 'Download failed', description: 'Failed to download certificate', variant: 'destructive' })
-                            }
-                          }}
-                          className="px-3 py-2 bg-primary text-white text-sm font-semibold rounded-lg hover:bg-primary/90 transition-colors flex-shrink-0"
-                        >
-                          ↓ Certificate
-                        </Button>
-                      )}
+                            }}
+                            className="px-3 py-2 bg-primary text-white text-sm font-semibold rounded-lg hover:bg-primary/90 transition-colors flex-shrink-0"
+                          >
+                            ↓ Certificate
+                          </Button>
+                        )}
+                      </div>
                     </div>
                   ))
                 )}

@@ -46,7 +46,7 @@ export default function SignupPage() {
     e.preventDefault()
     setError('')
 
-    if (!formData.name || !formData.email || !formData.password || !formData.phone) {
+    if (!formData.name.trim() || !formData.email.trim() || !formData.password || !formData.phone.trim()) {
       setError('Please fill in all required fields')
       return
     }
@@ -61,6 +61,24 @@ export default function SignupPage() {
       return
     }
 
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(formData.email.trim())) {
+      setError('Please enter a valid email address')
+      return
+    }
+
+    const phoneRegex = /^\+92[0-9]{10}$/
+    const normalizedPhone = formData.phone.trim().replace(/\s+/g, '')
+    if (!phoneRegex.test(normalizedPhone)) {
+      setError('Phone number must be a valid Pakistani number in format +92xxxxxxxxxx')
+      return
+    }
+
+    if (formData.password.length < 8 || !/(?=.*[A-Z])(?=.*[a-z])(?=.*\d)/.test(formData.password)) {
+      setError('Password must be at least 8 characters and include uppercase, lowercase, and a number')
+      return
+    }
+
     if ((role === 'donor' || role === 'receiver') && !bloodGroup) {
       setError('Please select your blood group')
       return
@@ -68,17 +86,17 @@ export default function SignupPage() {
 
     try {
       await signup({
-        name: formData.name,
-        email: formData.email,
+        name: formData.name.trim(),
+        email: formData.email.trim().toLowerCase(),
         password: formData.password,
-        phone: formData.phone,
+        phone: normalizedPhone,
         role: role as Exclude<UserRole, null>,
         city: city || 'Karachi',
         bloodGroup: bloodGroup || undefined,
       })
       router.push('/dashboard')
     } catch (err) {
-      setError('Signup failed. Please try again.')
+      setError(err instanceof Error ? err.message : 'Signup failed. Please try again.')
     }
   }
 

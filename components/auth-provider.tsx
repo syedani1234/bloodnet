@@ -40,6 +40,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.error('Failed to parse stored user:', error)
       }
     }
+
+    const hydrateUser = async () => {
+      try {
+        const res = await fetch('/api/auth/me')
+        if (!res.ok) return
+        const data = await res.json()
+        if (data?.user) {
+          const normalizedUser = {
+            ...data.user,
+            role: data.user?.role ?? 'donor',
+            city: data.user?.city ?? 'Karachi',
+            phone: data.user?.phone ?? '',
+          }
+          setUser(normalizedUser)
+          localStorage.setItem('bloodnet_user', JSON.stringify(normalizedUser))
+        }
+      } catch (error) {
+        console.error('Failed to hydrate auth user:', error)
+      }
+    }
+
+    void hydrateUser()
   }, [])
 
   const login = async (email: string, password: string, role: UserRole) => {
@@ -93,6 +115,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       setUser(normalizedUser)
       localStorage.setItem('bloodnet_user', JSON.stringify(normalizedUser))
+    } catch (error) {
+      throw error instanceof Error ? error : new Error('Signup failed. Please try again.')
     } finally {
       setIsLoading(false)
     }

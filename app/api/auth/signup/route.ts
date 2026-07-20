@@ -3,46 +3,49 @@ import bcrypt from 'bcryptjs'
 import { getDbNameForCity } from '@/lib/db-config'
 import { getDb } from '@/lib/mongodb'
 import { mapMongoUserToAppUser } from '@/lib/mappers'
+import { validateSignupInput } from '@/lib/validation-utils'
 import type { AppRole } from '@/lib/types'
 
 export async function POST(req: NextRequest) {
   try {
-    const { name, email, password, phone, role, city, bloodGroup } = await req.json()
+    const payload = await req.json()
+    const { name, email, password, phone, role, city, bloodGroup } = payload
 
-    if (!name || !email || !password || !phone || !role || !city) {
-      return NextResponse.json({ error: 'All required fields must be filled' }, { status: 400 })
+    const validation = validateSignupInput({ name, email, password, phone, role, city, bloodGroup })
+    if (!validation.isValid) {
+      return NextResponse.json({ error: validation.errors[0] }, { status: 400 })
     }
 
     if (role === 'admin') {
       return NextResponse.json({ error: 'Admin signup is not allowed' }, { status: 400 })
     }
 
-    if (!['donor', 'receiver', 'hospital'].includes(role)) {
-      return NextResponse.json({ error: 'Only donor, receiver, and hospital roles are allowed' }, { status: 400 })
-    }
+    const normalizedEmail = String(email).trim().toLowerCase()
+    const normalizedPhone = String(phone).trim().replace(/\s+/g, '')
+    const normalizedCity = String(city).trim()
 
-    const dbName = getDbNameForCity(city)
+    const dbName = getDbNameForCity(normalizedCity)
     const db = await getDb(dbName)
     const users = db.collection('users')
 
-    const existing = await users.findOne({ email: email.toLowerCase() })
+    const existing = await users.findOne({ email: normalizedEmail })
     if (existing) {
       return NextResponse.json({ error: 'Email already registered' }, { status: 409 })
     }
 
-    const passwordHash = await bcrypt.hash(password, 10)
+    const passwordHash = await bcrypt.hash(String(password), 10)
     const now = new Date().toISOString()
 
     const newUser = {
-      name,
-      email: email.toLowerCase(),
+      name: String(name).trim(),
+      email: normalizedEmail,
       passwordHash,
-      phone,
+      phone: normalizedPhone,
       role: role as AppRole,
-      city,
+      city: normalizedCity,
       bloodGroup: role === 'donor' || role === 'receiver' ? bloodGroup : undefined,
-      isVerified: role === 'hospital' ? false : false,
-      availability: role === 'donor' ? true : undefined,  // FIX: Set availability for donors
+      isVerified: false,
+      availability: role === 'donor' ? true : undefined,
       totalDonations: 0,
       livesImpacted: 0,
       achievements: [],

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { useToast } from '@/hooks/use-toast'
 import { Users, Heart, TrendingUp, AlertCircle, BarChart3, Shield, CheckCircle, Clock, Activity, Building2, Zap, Droplet } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
@@ -12,21 +13,24 @@ interface AdminDashboardProps {
 }
 
 export default function AdminDashboard({ user }: AdminDashboardProps) {
+  const { toast } = useToast()
   const [isClient, setIsClient] = useState(false)
   const [kpis, setKpis] = useState<any>(null)
   const [users, setUsers] = useState<any[]>([])
   const [requests, setRequests] = useState<any[]>([])
   const [activity, setActivity] = useState<any[]>([])
+  const [pendingDonations, setPendingDonations] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
     setIsClient(true)
     async function loadAdminData() {
       try {
-        const [kpisRes, usersRes, requestsRes] = await Promise.all([
+        const [kpisRes, usersRes, requestsRes, pendingRes] = await Promise.all([
           fetch('/api/admin/kpis?city=Karachi'),
           fetch('/api/users?city=Karachi'),
           fetch('/api/requests?city=Karachi'),
+          fetch('/api/admin/donations/pending?city=Karachi'),
         ])
 
         let fetchedKpis: any = null
@@ -45,10 +49,16 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
           const requestsData = await requestsRes.json()
           fetchedRequests = Array.isArray(requestsData) ? requestsData : requestsData.requests || []
         }
+        let fetchedPendingDonations: any[] = []
+        if (pendingRes.ok) {
+          const pendingData = await pendingRes.json()
+          fetchedPendingDonations = pendingData.donations || []
+        }
 
         setKpis(fetchedKpis)
         setUsers(fetchedUsers)
         setRequests(fetchedRequests)
+        setPendingDonations(fetchedPendingDonations)
 
         const activityItems = [
           ...fetchedUsers.slice(0, 3).map((entry: any) => ({
@@ -201,6 +211,20 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
     status: entry.isVerified ? 'Verified' : 'Active',
   }))
 
+  const handleApproveDonation = async (donationId: string) => {
+    try {
+      const res = await fetch(`/api/admin/donations/${donationId}/approve?city=Karachi`, { method: 'PATCH' })
+      const payload = await res.json()
+      if (!res.ok || !payload.success) {
+        throw new Error(payload.error || 'Approval failed')
+      }
+      toast({ title: 'Donation approved', description: 'Certificate generated and donation marked complete.', variant: 'default' })
+      setPendingDonations((current) => current.filter((item) => item.id !== donationId))
+    } catch (error) {
+      toast({ title: 'Approval failed', description: error instanceof Error ? error.message : 'Please try again.', variant: 'destructive' })
+    }
+  }
+
   const pendingRequests = [
     { id: 1, type: 'Pending Approvals', count: kpis?.pendingApprovals ?? 0, urgent: true },
     { id: 2, type: 'Verified Donors', count: kpis?.eligibleDonors ?? 0, urgent: false },
@@ -256,6 +280,34 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
       </div>
 
       {/* Main Content Tabs */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Shield className="h-5 w-5" />
+            Pending Donation Approvals
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {pendingDonations.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No pending donation approvals.</p>
+          ) : (
+            <div className="space-y-3">
+              {pendingDonations.map((donation) => (
+                <div key={donation.id} className="flex items-center justify-between rounded-lg border p-3">
+                  <div>
+                    <p className="font-semibold">{donation.donorName || 'Donor'} → {donation.recipientName || 'Receiver'}</p>
+                    <p className="text-sm text-muted-foreground">{donation.bloodGroup} • {donation.units} unit(s) • {donation.hospitalName || 'Direct donation'}</p>
+                  </div>
+                  <Button size="sm" onClick={() => void handleApproveDonation(donation.id)}>
+                    Approve
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       <Tabs defaultValue="overview" className="w-full">
         <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="overview">Overview</TabsTrigger>

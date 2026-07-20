@@ -268,7 +268,9 @@ export default function RequestBloodPage() {
           urgencyLevel: formData.urgencyLevel,
           unitsRequired: formData.unitsRequired,
           contactNumber: formData.contactNumber,
+          selectedDonorId: selectedDonor.id,
           selectedDonorEmail: selectedDonor.email,
+          selectedDonorName: selectedDonor.name,
           requesterId: user?.id || 'hospital-request',
         }),
       })

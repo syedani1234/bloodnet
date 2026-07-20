@@ -54,13 +54,6 @@ export default function LoginPage() {
                 <p className="text-sm text-muted-foreground mt-2">Sign in to your account</p>
               </div>
 
-              <div className="mb-6 p-3 sm:p-4 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-900">
-                <p className="text-xs sm:text-sm font-semibold text-blue-900 dark:text-blue-100 mb-2">Sign in with your registered account</p>
-                <p className="text-xs text-blue-800 dark:text-blue-300">
-                  Use the email and password you created during signup. Your account is stored securely in your MongoDB database.
-                </p>
-              </div>
-
               {error && (
                 <div className="mb-4 p-3 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900 rounded text-sm text-red-700 dark:text-red-400">
                   {error}

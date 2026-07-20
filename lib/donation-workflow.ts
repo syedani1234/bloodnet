@@ -83,6 +83,50 @@ export async function createDonationRecord(input: Partial<DonationDocument> & { 
   return { ...donation, id: result.insertedId.toString() }
 }
 
+export async function confirmDonationByDonor(
+  donationId: string,
+  donorId: string,
+  donorName: string,
+  city: string
+) {
+  const dbName = getDbNameForCity(city)
+  const db = await getDb(dbName)
+  const donation = await db.collection<DonationDocument>('donations').findOne({ _id: new ObjectId(donationId) })
+
+  if (!donation) {
+    return { success: false, message: 'Donation not found' }
+  }
+
+  if (donation.donorId && donation.donorId !== donorId) {
+    return { success: false, message: 'Only the donor can confirm this donation' }
+  }
+
+  if (donation.status === 'completed' || donation.status === 'rejected') {
+    return { success: false, message: `Donation already ${donation.status}` }
+  }
+
+  const updatedAt = new Date().toISOString()
+  await db.collection('donations').updateOne(
+    { _id: donation._id },
+    {
+      $set: {
+        status: 'submitted',
+        donorId,
+        donorName,
+        updatedAt,
+      },
+    }
+  )
+
+  const updatedDonation = await db.collection<DonationDocument>('donations').findOne({ _id: donation._id })
+
+  return {
+    success: true,
+    message: 'Donation marked as donated by donor',
+    donation: updatedDonation ? { ...updatedDonation, id: updatedDonation._id.toString() } : null,
+  }
+}
+
 export async function confirmDonationByReceiver(
   donationId: string,
   receiverId: string,
@@ -140,7 +184,7 @@ export async function confirmDonationByReceiver(
 export async function getPendingDonations(city: string) {
   const dbName = getDbNameForCity(city)
   const db = await getDb(dbName)
-  const docs = await db.collection<DonationDocument>('donations').find({ status: 'receiver_confirmed' }).sort({ updatedAt: -1 }).toArray()
+  const docs = await db.collection<DonationDocument>('donations').find({ status: { $in: ['submitted', 'receiver_confirmed'] } }).sort({ updatedAt: -1 }).toArray()
   return docs.map((d) => ({ ...d, id: d._id.toString() }))
 }
 

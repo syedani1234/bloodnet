@@ -17,6 +17,9 @@ export async function POST(req: NextRequest) {
       city = 'Karachi',
       hospitalName,
       reason,
+      selectedDonorId,
+      selectedDonorEmail,
+      selectedDonorName,
       // Old field mapping for backward compatibility
       patientName,
       urgencyLevel,
@@ -53,6 +56,16 @@ export async function POST(req: NextRequest) {
       hospitalName,
       reason
     )
+
+    if (selectedDonorId && selectedDonorEmail && selectedDonorName) {
+      await donorAcceptsRequest(
+        request.id || request._id?.toString() || '',
+        selectedDonorId,
+        selectedDonorEmail,
+        selectedDonorName,
+        city
+      )
+    }
 
     return NextResponse.json(
       {

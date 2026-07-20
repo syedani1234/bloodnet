@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useToast } from '@/hooks/use-toast'
+import { getDonationFlowState } from '@/lib/donation-flow-state'
 import { Heart, Clock, CheckCircle, XCircle, AlertCircle, MapPin } from 'lucide-react'
 
 interface BloodRequest {
@@ -35,7 +36,9 @@ export default function ReceiverDashboard({ user }: { user: User }) {
   const { toast } = useToast()
   const [activeTab, setActiveTab] = useState('overview')
   const [myRequests, setMyRequests] = useState<BloodRequest[]>([])
+  const [donations, setDonations] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadingDonations, setLoadingDonations] = useState(true)
 
   useEffect(() => {
     loadReceiverData()
@@ -44,15 +47,25 @@ export default function ReceiverDashboard({ user }: { user: User }) {
   async function loadReceiverData() {
     try {
       const city = user?.city || 'Karachi'
-      const res = await fetch(`/api/blood-requests?requesterId=${user.id}&city=${encodeURIComponent(city)}`)
-      if (res.ok) {
-        const requests = await res.json()
-        setMyRequests(requests)
+      const [requestsRes, donationsRes] = await Promise.all([
+        fetch(`/api/blood-requests?requesterId=${user.id}&city=${encodeURIComponent(city)}`),
+        fetch(`/api/donations?city=${encodeURIComponent(city)}&recipientId=${encodeURIComponent(user.id)}`),
+      ])
+
+      if (requestsRes.ok) {
+        const requests = await requestsRes.json()
+        setMyRequests(Array.isArray(requests) ? requests : requests.bloodRequests ?? [])
+      }
+
+      if (donationsRes.ok) {
+        const donationPayload = await donationsRes.json()
+        setDonations(Array.isArray(donationPayload) ? donationPayload : [])
       }
     } catch (err) {
       toast({ title: 'Error', description: 'Failed to load requests', variant: 'destructive' })
     } finally {
       setLoading(false)
+      setLoadingDonations(false)
     }
   }
 
@@ -77,6 +90,24 @@ export default function ReceiverDashboard({ user }: { user: User }) {
       expired: 'bg-red-100 text-red-700',
     }
     return badges[status] || 'bg-gray-100 text-gray-700'
+  }
+
+  const handleConfirmReceipt = async (donationId: string) => {
+    try {
+      const res = await fetch(`/api/donations/${donationId}/confirm`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ receiverId: user.id, receiverName: user.name, city: user.city }),
+      })
+      const payload = await res.json()
+      if (!res.ok || !payload.success) {
+        throw new Error(payload.error || 'Failed to confirm receipt')
+      }
+      toast({ title: 'Receipt confirmed', description: 'The admin can now approve the donation and issue the certificate.', variant: 'default' })
+      await loadReceiverData()
+    } catch (err) {
+      toast({ title: 'Confirmation failed', description: err instanceof Error ? err.message : 'Please try again.', variant: 'destructive' })
+    }
   }
 
   return (
@@ -181,6 +212,46 @@ export default function ReceiverDashboard({ user }: { user: User }) {
               )}
             </CardContent>
           </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Pending Donation Confirmations</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {loadingDonations ? (
+                <p className="text-muted-foreground">Loading donations...</p>
+              ) : donations.length === 0 ? (
+                <p className="text-muted-foreground">No donation confirmations pending.</p>
+              ) : (
+                <div className="space-y-3">
+                  {donations.map((donation) => {
+                    const flow = getDonationFlowState(
+                      donation.status || 'pending',
+                      Boolean(donation.status === 'submitted' || donation.status === 'receiver_confirmed' || donation.status === 'completed'),
+                      Boolean(donation.recipientConfirmed || donation.status === 'receiver_confirmed' || donation.status === 'completed')
+                    )
+
+                    return (
+                      <div key={donation.id} className="flex items-center justify-between rounded-lg border p-3">
+                        <div>
+                          <p className="font-semibold">{donation.donorName || 'Donor'} → {donation.recipientName || user.name}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {donation.bloodGroup} • {donation.units} unit(s) • {donation.hospitalName || 'Direct match'}
+                          </p>
+                          <p className="mt-1 text-xs text-muted-foreground">{flow.label}</p>
+                        </div>
+                        {flow.canConfirmReceiver && (
+                          <Button size="sm" onClick={() => void handleConfirmReceipt(donation.id)}>
+                            Confirm Receipt
+                          </Button>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="active" className="space-y-4">
@@ -222,6 +293,15 @@ export default function ReceiverDashboard({ user }: { user: User }) {
                           </Button>
                         </div>
                       </div>
+                      {(() => {
+                        const flow = getDonationFlowState(req.status, true, false)
+                        return (
+                          <div className="mt-3 rounded-md border border-blue-200 bg-white/70 p-3 text-sm text-blue-900">
+                            <p className="font-semibold">{flow.label}</p>
+                            <p className="mt-1">Once the donor confirms the donation, you can confirm receipt and the admin can approve the case.</p>
+                          </div>
+                        )
+                      })()}
                       {req.estimatedDeliveryTime && (
                         <div className="mt-3 text-sm text-blue-900">
                           <Clock className="w-4 h-4 inline mr-2" />
