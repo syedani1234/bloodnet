@@ -327,25 +327,29 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
               </CardHeader>
               <CardContent>
                 {isClient && (
-                <ResponsiveContainer width="100%" height={300}>
-                  <PieChart>
-                    <Pie
-                      data={bloodGroupData}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      label={({ name, value }) => `${name}: ${value}`}
-                      outerRadius={80}
-                      fill="#ef4444"
-                      dataKey="value"
-                    >
+                <div className="w-full overflow-hidden">
+                  <ResponsiveContainer width="100%" height={320}>
+                    <PieChart>
+                      <Pie
+                        data={bloodGroupData}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={false}
+                        label={({ name, value }) => `${name}: ${value}`}
+                        outerRadius={90}
+                        innerRadius={40}
+                        paddingAngle={2}
+                        fill="#ef4444"
+                        dataKey="value"
+                      >
                       {bloodGroupData.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={['#ef4444', '#f97316', '#eab308', '#84cc16', '#22c55e', '#10b981', '#06b6d4', '#0ea5e9'][index % 8]} />
                       ))}
-                    </Pie>
-                    <Tooltip />
-                  </PieChart>
-                </ResponsiveContainer>
+                      </Pie>
+                      <Tooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
                 )}
               </CardContent>
             </Card>
@@ -563,25 +567,29 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
             </CardHeader>
             <CardContent>
               {isClient && (
-              <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie
-                    data={requestStatusData}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={({ name, value }) => `${name}: ${value}`}
-                    outerRadius={80}
-                    fill="#ef4444"
-                    dataKey="value"
-                  >
-                    {requestStatusData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
+              <div className="w-full overflow-hidden">
+                <ResponsiveContainer width="100%" height={320}>
+                  <PieChart>
+                    <Pie
+                      data={requestStatusData}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={({ name, value }) => `${name}: ${value}`}
+                      outerRadius={90}
+                      innerRadius={40}
+                      paddingAngle={2}
+                      fill="#ef4444"
+                      dataKey="value"
+                    >
+                      {requestStatusData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
               )}
             </CardContent>
           </Card>

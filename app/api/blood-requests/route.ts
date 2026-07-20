@@ -90,6 +90,8 @@ export async function GET(req: NextRequest) {
     const city = searchParams.get('city') || 'Karachi'
     const status = searchParams.get('status')
     const requesterId = searchParams.get('requesterId')
+    const donorId = searchParams.get('donorId')
+    const donorEmail = searchParams.get('donorEmail')
 
     const dbName = getDbNameForCity(city)
     const db = await getDb(dbName)
@@ -97,6 +99,12 @@ export async function GET(req: NextRequest) {
     const filter: Record<string, any> = { city }
     if (status) filter.status = status
     if (requesterId) filter.requesterId = requesterId
+    if (donorId || donorEmail) {
+      const donorMatches: Record<string, any>[] = []
+      if (donorId) donorMatches.push({ acceptedDonorId: donorId })
+      if (donorEmail) donorMatches.push({ acceptedDonorEmail: donorEmail })
+      if (donorMatches.length) filter.$or = donorMatches
+    }
 
     const bloodRequests = await db
       .collection('blood_requests')

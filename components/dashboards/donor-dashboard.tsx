@@ -86,7 +86,9 @@ export default function DonorDashboard({ user }: DonorDashboardProps) {
 
     async function loadRequests() {
       try {
-        const response = await fetch(`/api/blood-requests?city=${encodeURIComponent(user.city)}`)
+        const response = await fetch(
+          `/api/blood-requests?city=${encodeURIComponent(user.city)}&donorId=${encodeURIComponent(user.id)}&donorEmail=${encodeURIComponent(user.email)}`
+        )
         if (!response.ok) {
           console.error('Failed to load blood requests')
           return
@@ -265,7 +267,7 @@ export default function DonorDashboard({ user }: DonorDashboardProps) {
 
       <Tabs defaultValue="requests" className="w-full">
         <TabsList className="grid w-full grid-cols-1 sm:grid-cols-3">
-          <TabsTrigger value="requests">Active Requests</TabsTrigger>
+          <TabsTrigger value="requests">Requests & Tracking</TabsTrigger>
           <TabsTrigger value="history">Donation History</TabsTrigger>
           <TabsTrigger value="profile">Profile</TabsTrigger>
         </TabsList>
@@ -273,50 +275,80 @@ export default function DonorDashboard({ user }: DonorDashboardProps) {
         <TabsContent value="requests" className="space-y-6">
           <Card>
             <CardContent className="pt-6">
-              <h3 className="text-lg font-bold mb-4">Blood Requests Near You</h3>
-              <KarachiBloodRequestMap requests={bloodRequests} />
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold">Requests assigned to you</h3>
+                <span className="text-sm text-muted-foreground">Live tracking for donor actions</span>
+              </div>
+              {isLoadingRequests ? (
+                <p className="text-sm text-muted-foreground">Loading requests...</p>
+              ) : bloodRequests.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No requests are currently assigned to you.</p>
+              ) : (
+                <div className="space-y-3">
+                  {bloodRequests.map((request) => {
+                    const flow = getDonationFlowState(request.status || 'open', Boolean(request.acceptedDonorId || request.status === 'accepted'), false)
+                    return (
+                      <div key={request.id} className="rounded-lg border p-4">
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                          <div>
+                            <p className="font-semibold">{request.unitsRequired || request.units} units of {request.bloodGroup}</p>
+                            <p className="text-sm text-muted-foreground mt-1">{request.requesterName || 'Receiver'} • {request.hospitalName || request.city}</p>
+                            <p className="text-xs text-muted-foreground mt-2">{flow.label}</p>
+                          </div>
+                          <div className="text-right">
+                            <span className={`inline-block px-3 py-1 rounded text-sm font-semibold ${request.urgencyLevel === 'emergency' ? 'bg-red-100 text-red-700' : request.urgencyLevel === 'urgent' ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'}`}>
+                              {request.urgencyLevel ? request.urgencyLevel.charAt(0).toUpperCase() + request.urgencyLevel.slice(1) : 'Normal'}
+                            </span>
+                            <p className="text-xs text-muted-foreground mt-1">{request.createdAt || 'Recently'}</p>
+                          </div>
+                        </div>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {flow.canConfirmDonor && (
+                            <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={() => {
+                              void (async () => {
+                                try {
+                                  const res = await fetch('/api/donations/submission', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                      donorId: user.id,
+                                      donorName: user.name,
+                                      donorEmail: user.email,
+                                      bloodGroup: request.bloodGroup || user.bloodGroup,
+                                      hospitalName: request.hospitalName || 'Direct Match',
+                                      city: user.city,
+                                      action: 'submit',
+                                      donationDate: new Date().toISOString().split('T')[0],
+                                    }),
+                                  })
+                                  const payload = await res.json()
+                                  if (!res.ok) throw new Error(payload.error || 'Failed to submit donation')
+                                  toast({ title: 'Donation submitted', description: 'Your confirmation is now pending receiver review.', variant: 'default' })
+                                  window.location.reload()
+                                } catch (error) {
+                                  toast({ title: 'Submission failed', description: error instanceof Error ? error.message : 'Please try again.', variant: 'destructive' })
+                                }
+                              })()
+                            }}>
+                              Confirm Donation
+                            </Button>
+                          )}
+                          <Button size="sm" variant="outline" onClick={() => window.open(`https://wa.me/${request.requesterEmail || ''}?text=Hi%20${request.requesterName || 'receiver'}%2C%20I%20am%20ready%20to%20help%20with%20the%20blood%20request.`, '_blank')}>
+                            Contact Receiver
+                          </Button>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
             </CardContent>
           </Card>
 
           <Card>
             <CardContent className="pt-6">
-              <h3 className="text-lg font-bold mb-4">Urgent Requests</h3>
-              <div className="space-y-3">
-                {isLoadingRequests ? (
-                  <p className="text-sm text-muted-foreground">Loading requests...</p>
-                ) : bloodRequests.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No urgent requests found in your city.</p>
-                ) : (
-                  bloodRequests.slice(0, 3).map((request) => (
-                    <div
-                      key={request.id}
-                      className="flex items-center justify-between p-3 border border-border rounded-lg hover:bg-muted/50 transition-colors"
-                    >
-                      <div>
-                        <p className="font-semibold">{request.unitsRequired || request.units} units of {request.bloodGroup}</p>
-                        <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
-                          <MapPin className="h-4 w-4" />
-                          {request.hospitalName}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <span
-                          className={`inline-block px-3 py-1 rounded text-sm font-semibold ${
-                            request.urgencyLevel === 'emergency'
-                              ? 'bg-red-100 text-red-700'
-                              : request.urgencyLevel === 'urgent'
-                                ? 'bg-orange-100 text-orange-700'
-                                : 'bg-blue-100 text-blue-700'
-                          }`}
-                        >
-                          {request.urgencyLevel ? request.urgencyLevel.charAt(0).toUpperCase() + request.urgencyLevel.slice(1) : 'Normal'}
-                        </span>
-                        <p className="text-xs text-muted-foreground mt-1">{request.createdAt || 'Recently'}</p>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
+              <h3 className="text-lg font-bold mb-4">Blood Requests Near You</h3>
+              <KarachiBloodRequestMap requests={bloodRequests} />
             </CardContent>
           </Card>
         </TabsContent>
