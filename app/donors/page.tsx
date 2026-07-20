@@ -19,6 +19,7 @@ export default function DonorsPage() {
   const [filterBloodGroup, setFilterBloodGroup] = useState("all")
   const [viewType, setViewType] = useState<"grid" | "list">("grid")
   const [donors, setDonors] = useState<Donor[]>([])
+  const [databaseName, setDatabaseName] = useState("bloodnet_karachi")
   const [loading, setLoading] = useState(true)
   const { user } = useAuth()
   const { toast } = useToast()
@@ -29,6 +30,7 @@ export default function DonorsPage() {
         const res = await fetch('/api/donors?city=Karachi')
         const data = await res.json()
         if (data.donors) setDonors(data.donors)
+        if (data.database) setDatabaseName(data.database)
       } catch (error) {
         console.error('Failed to load donors:', error)
       } finally {
@@ -103,7 +105,7 @@ export default function DonorsPage() {
           <div className="mb-8 animate-in fade-in slide-in-from-top-4" style={{ animationFillMode: 'both' }}>
             <h1 className="text-4xl font-bold mb-2">Find Blood Donors in Karachi</h1>
             <p className="text-lg text-muted-foreground">
-              {loading ? 'Loading donors from MongoDB...' : `${filteredDonors.length} verified donors from bloodnet_karachi database`}
+              {loading ? 'Loading donors from MongoDB...' : `${filteredDonors.length} verified donors from ${databaseName} database`}
             </p>
           </div>
 

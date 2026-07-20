@@ -8,6 +8,10 @@ import { getDb } from '@/lib/mongodb'
 import { isValidEmail, isValidPakistaniPhone, normalizePakistaniPhone } from '@/lib/validation-utils'
 import type { MongoUser } from '@/lib/types'
 
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url)
@@ -16,6 +20,8 @@ export async function GET(req: NextRequest) {
     const availableOnly = searchParams.get('available') !== 'false'
     const compatibleBloodGroups = bloodGroup ? getCompatibleDonorBloodGroups(bloodGroup) : []
     const bloodGroupFilter = compatibleBloodGroups.length ? { $in: compatibleBloodGroups } : bloodGroup
+    const cityFilter = { $regex: `^${escapeRegExp(city)}$`, $options: 'i' }
+    const userAvailabilityFilter = [{ availability: { $ne: false } }, { available: true }]
 
     let donors: any[] = []
 
@@ -23,9 +29,9 @@ export async function GET(req: NextRequest) {
       const db = await getDb(DB_KARACHI)
       
       // Query donors collection
-      const donorFilter: Record<string, unknown> = { city }
+      const donorFilter: Record<string, unknown> = { city: cityFilter }
       if (bloodGroup) donorFilter.bloodGroup = bloodGroupFilter
-      if (availableOnly) donorFilter.available = true
+      if (availableOnly) donorFilter.available = { $ne: false }
       
       const donorDocs = await db.collection('donors').find(donorFilter).toArray()
       const donorsFromCollection = donorDocs
@@ -33,9 +39,9 @@ export async function GET(req: NextRequest) {
         .map((doc) => mapKarachiDonorDoc(doc))
       
       // Query users collection (role='donor')
-      const userFilter: Record<string, unknown> = { role: 'donor', city }
+      const userFilter: Record<string, unknown> = { role: 'donor', city: cityFilter }
       if (bloodGroup) userFilter.bloodGroup = bloodGroupFilter
-      if (availableOnly) userFilter.availability = true  // FIX: Use correct field name
+      if (availableOnly) userFilter.$or = userAvailabilityFilter
       
       const userDocs = await db.collection<MongoUser>('users').find(userFilter).toArray()
       const donorsFromUsers = userDocs
@@ -46,9 +52,9 @@ export async function GET(req: NextRequest) {
     } else {
       const db = await getDb(DB_PAKISTAN)
       
-      const userFilter: Record<string, unknown> = { role: 'donor', city }
+      const userFilter: Record<string, unknown> = { role: 'donor', city: cityFilter }
       if (bloodGroup) userFilter.bloodGroup = bloodGroupFilter
-      if (availableOnly) userFilter.availability = true  // FIX: Use correct field name
+      if (availableOnly) userFilter.$or = userAvailabilityFilter
       
       const users = await db.collection<MongoUser>('users').find(userFilter).toArray()
       donors = users
