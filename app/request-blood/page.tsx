@@ -424,8 +424,8 @@ export default function RequestBloodPage() {
             </p>
           </div>
 
-          {/* Stage Indicators - Only show if logged in */}
-          {user && (
+          {/* Stage Indicators */}
+          {
             <div className="mb-8 sm:mb-10">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-0">
                 {[
@@ -467,7 +467,7 @@ export default function RequestBloodPage() {
                 ))}
               </div>
             </div>
-          )}
+          }
 
           {/* Stage Description */}
           {user && (
@@ -657,10 +657,10 @@ export default function RequestBloodPage() {
           )}
 
           {/* Stage 2: Find Donors with Recommendations */}
-          {stage === 2 && user && (
+          {stage === 2 && (
             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4" style={{ animationFillMode: 'both' }}>
               {/* Hospital Emergency Alert Button */}
-              {user.role === 'hospital' && (
+              {user && user.role === 'hospital' && (
                 <Card className={`border-2 ${showEmergencyAlert ? 'border-red-500 bg-red-50 dark:bg-red-950/30' : 'border-red-300 bg-red-50/50 dark:bg-red-950/20'}`}>
                   <CardContent className="pt-6">
                     <div className="flex items-center justify-between gap-4">
@@ -739,7 +739,12 @@ export default function RequestBloodPage() {
                             ))}
                           </div>
 
-                          <Button className="w-full mt-4 gap-2 bg-primary text-white">
+                          <Button className="w-full mt-4 gap-2 bg-primary text-white" onClick={() => {
+                            if (!user) {
+                              toast({ title: 'Login required', description: 'Please log in to contact donors or confirm requests', variant: 'default' })
+                              return
+                            }
+                          }}>
                             <Phone className="h-4 w-4" />
                             Contact Recommended Donor
                           </Button>
@@ -780,7 +785,7 @@ export default function RequestBloodPage() {
                                 <BloodBadge bloodType={donor.bloodGroup} size="lg" />
                               </div>
 
-                              <div className="grid grid-cols-3 gap-2 text-sm">
+                                <div className="grid grid-cols-3 gap-2 text-sm">
                                 <div>
                                   <p className="text-muted-foreground">Health</p>
                                   <p className="font-bold text-primary">{donor.health}%</p>
@@ -790,8 +795,8 @@ export default function RequestBloodPage() {
                                   <p className="font-bold">{donor.donations}</p>
                                 </div>
                                 <div>
-                                  <p className="text-muted-foreground">Status</p>
-                                  <p className="font-semibold text-green-600">Available</p>
+                                  <p className="text-muted-foreground">Blood Type</p>
+                                  <p className="font-semibold text-foreground"><BloodBadge bloodType={donor.bloodGroup} size="sm" /></p>
                                 </div>
                               </div>
                             </div>
@@ -842,7 +847,7 @@ export default function RequestBloodPage() {
           )}
 
           {/* Stage 3: Contact & Confirm */}
-          {stage === 3 && selectedDonor && user && (
+          {stage === 3 && selectedDonor && (
             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4" style={{ animationFillMode: 'both' }}>
               <div className="grid md:grid-cols-2 gap-8">
                 <Card>
@@ -889,18 +894,29 @@ export default function RequestBloodPage() {
                           <Phone className="h-5 w-5" />
                           Contact Donor
                         </h4>
-                        <a
-                          href={`tel:${selectedDonor.phone}`}
-                          className="block w-full py-3 px-4 bg-primary text-white font-semibold rounded-lg hover:bg-primary/90 text-center transition-all"
-                        >
-                          Call Now
-                        </a>
-                        <a
-                          href={`https://wa.me/${selectedDonor.phone.replace(/[^0-9]/g, '')}`}
-                          className="block w-full py-3 px-4 mt-3 border border-primary text-primary font-semibold rounded-lg hover:bg-primary/10 text-center transition-all"
-                        >
-                          Send WhatsApp
-                        </a>
+                        {user ? (
+                          <>
+                            <a
+                              href={`tel:${selectedDonor.phone}`}
+                              className="block w-full py-3 px-4 bg-primary text-white font-semibold rounded-lg hover:bg-primary/90 text-center transition-all"
+                            >
+                              Call Now
+                            </a>
+                            <a
+                              href={`https://wa.me/${selectedDonor.phone.replace(/[^0-9]/g, '')}`}
+                              className="block w-full py-3 px-4 mt-3 border border-primary text-primary font-semibold rounded-lg hover:bg-primary/10 text-center transition-all"
+                            >
+                              Send WhatsApp
+                            </a>
+                          </>
+                        ) : (
+                          <div className="p-4 border border-border rounded-lg text-center">
+                            <p className="text-sm text-muted-foreground">Login to view contact details and confirm a donation.</p>
+                            <Link href="/login" className="inline-block mt-3">
+                              <Button className="px-4">Login</Button>
+                            </Link>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </CardContent>
