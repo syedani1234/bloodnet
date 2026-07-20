@@ -4,6 +4,25 @@ import { getDbNameForCity } from '@/lib/db-config'
 import { getDb } from '@/lib/mongodb'
 import { requireAuth } from '@/lib/auth'
 
+function mapNotification(n: any) {
+  return {
+    id: n._id.toString(),
+    type: n.type,
+    title: n.title,
+    message: n.message,
+    timestamp: n.timestamp ?? 'Just now',
+    createdAt: n.createdAt,
+    read: n.read ?? false,
+    actionUrl: n.actionUrl,
+    actionLabel: n.actionLabel,
+    senderId: n.senderId?.toString?.() || n.senderId || n.data?.donorId || n.data?.requesterId || n.data?.receiverId || '',
+    senderName: n.senderName || n.data?.donorName || n.data?.requesterName || n.data?.receiverName || n.title || 'BloodNet',
+    senderEmail: n.senderEmail || n.data?.donorEmail || n.data?.requesterEmail || '',
+    senderRole: n.senderRole || n.data?.senderRole || '',
+    donationId: n.donationId || n.data?.donationId,
+  }
+}
+
 export async function GET(req: NextRequest) {
   try {
     const auth = await requireAuth(req)
@@ -31,19 +50,7 @@ export async function GET(req: NextRequest) {
       .limit(50)
       .toArray()
 
-    const notifications = docs.map((n) => ({
-      id: n._id.toString(),
-      type: n.type,
-      title: n.title,
-      message: n.message,
-      timestamp: n.timestamp ?? 'Just now',
-      createdAt: n.createdAt,
-      read: n.read ?? false,
-      actionUrl: n.actionUrl,
-      actionLabel: n.actionLabel,
-      senderId: n.senderId?.toString?.() || n.senderId || n.data?.donorId || n.data?.requesterId || '',
-      senderName: n.senderName || n.data?.donorName || n.data?.requesterName || n.title || 'BloodNet',
-    }))
+    const notifications = docs.map(mapNotification)
 
     return NextResponse.json({
       notifications,
@@ -78,14 +85,17 @@ export async function PUT(req: NextRequest) {
     const userQuery = { $or: recipientMatchers }
 
     if (action === 'mark-as-read' && notificationId) {
-      await collection.updateOne(
+      const result = await collection.updateOne(
         { _id: new ObjectId(notificationId), ...userQuery },
-        { $set: { read: true } }
+        { $set: { read: true, updatedAt: new Date().toISOString() } }
       )
+      if (result.matchedCount === 0) {
+        return NextResponse.json({ error: 'Notification not found' }, { status: 404 })
+      }
       const notifications = await collection.find(userQuery).sort({ createdAt: -1 }).limit(50).toArray()
       return NextResponse.json({
         success: true,
-        notifications: notifications.map((n) => ({ ...n, id: n._id.toString() })),
+        notifications: notifications.map(mapNotification),
       })
     }
 
@@ -94,16 +104,19 @@ export async function PUT(req: NextRequest) {
       const notifications = await collection.find(userQuery).sort({ createdAt: -1 }).limit(50).toArray()
       return NextResponse.json({
         success: true,
-        notifications: notifications.map((n) => ({ ...n, id: n._id.toString() })),
+        notifications: notifications.map(mapNotification),
       })
     }
 
     if (action === 'delete' && notificationId) {
-      await collection.deleteOne({ _id: new ObjectId(notificationId), ...userQuery })
+      const result = await collection.deleteOne({ _id: new ObjectId(notificationId), ...userQuery })
+      if (result.deletedCount === 0) {
+        return NextResponse.json({ error: 'Notification not found' }, { status: 404 })
+      }
       const notifications = await collection.find(userQuery).sort({ createdAt: -1 }).limit(50).toArray()
       return NextResponse.json({
         success: true,
-        notifications: notifications.map((n) => ({ ...n, id: n._id.toString() })),
+        notifications: notifications.map(mapNotification),
       })
     }
 

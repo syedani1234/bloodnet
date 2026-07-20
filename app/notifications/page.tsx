@@ -59,19 +59,46 @@ export default function NotificationsPage() {
 
   const handleMarkAsRead = async (notificationId: string) => {
     try {
-      const res = await fetch(`/api/notifications/${notificationId}/read?city=${encodeURIComponent(user?.city || 'Karachi')}`, {
-        method: 'PATCH',
+      const city = user?.city || 'Karachi'
+      const res = await fetch('/api/notifications', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'mark-as-read', notificationId, city }),
       })
       if (res.ok) {
-        setNotifications(notifications.map((n) => (n.id === notificationId ? { ...n, read: true } : n)))
+        const data = await res.json()
+        setNotifications(data.notifications || notifications.map((n) => (n.id === notificationId ? { ...n, read: true } : n)))
+        toast({ title: 'Notification updated', description: 'Marked as read.' })
+      } else {
+        const data = await res.json().catch(() => ({}))
+        toast({ title: 'Update failed', description: data.error || 'Could not mark notification as read.', variant: 'destructive' })
       }
     } catch (error) {
       console.error('Failed to mark as read:', error)
+      toast({ title: 'Update failed', description: 'Could not mark notification as read.', variant: 'destructive' })
     }
   }
 
-  const handleDelete = (id: string) => {
-    setNotifications(notifications.filter((n) => n.id !== id))
+  const handleDelete = async (notificationId: string) => {
+    try {
+      const city = user?.city || 'Karachi'
+      const res = await fetch('/api/notifications', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'delete', notificationId, city }),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setNotifications(data.notifications || notifications.filter((n) => n.id !== notificationId))
+        toast({ title: 'Notification deleted' })
+      } else {
+        const data = await res.json().catch(() => ({}))
+        toast({ title: 'Delete failed', description: data.error || 'Could not delete notification.', variant: 'destructive' })
+      }
+    } catch (error) {
+      console.error('Failed to delete notification:', error)
+      toast({ title: 'Delete failed', description: 'Could not delete notification.', variant: 'destructive' })
+    }
   }
 
   const handleViewProfile = (senderId: string) => {

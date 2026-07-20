@@ -11,7 +11,7 @@ import {
 } from 'recharts'
 import {
   AlertTriangle, Droplet, TrendingUp, Users, Clock, CheckCircle,
-  Search, Filter, Plus, Send, Eye, FileText, BarChart3, Bell, Settings,
+  Search, Filter, Plus, Send, Eye, BarChart3, Bell, Settings,
   Download, MoreVertical, ChevronRight, Activity, Heart, Zap, Award,
   Building2, MapPin, Phone, Mail, Edit2, Loader2
 } from 'lucide-react'
@@ -57,8 +57,7 @@ export default function HospitalDashboard({ user }: HospitalDashboardProps) {
   const [submissions, setSubmissions] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    async function loadHospitalData() {
+  async function loadHospitalData() {
       try {
         const city = user?.city || 'Karachi'
         const [requestsRes, donorsRes, submissionsRes] = await Promise.all([
@@ -114,6 +113,7 @@ export default function HospitalDashboard({ user }: HospitalDashboardProps) {
       }
     }
 
+  useEffect(() => {
     loadHospitalData()
   }, [user?.city, user?.name])
 
@@ -157,6 +157,37 @@ export default function HospitalDashboard({ user }: HospitalDashboardProps) {
 
   const getStatusColor = (status: string) => {
     return status === 'fulfilled' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300'
+  }
+
+  const notifyAllDonors = async () => {
+    const availableDonors = donors.filter((donor) => donor.available !== false)
+    if (availableDonors.length === 0) {
+      toast({ title: 'No donors available', description: 'No available donors were found in your city.', variant: 'destructive' })
+      return
+    }
+
+    const city = user.city || 'Karachi'
+    const message = `${user.name} needs blood donors in ${city}. Please check BloodNet or contact the hospital if you are available.`
+    const results = await Promise.allSettled(
+      availableDonors.map((donor) =>
+        fetch('/api/notifications/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            recipientId: donor.id,
+            message,
+            type: 'blood_request',
+            city,
+          }),
+        })
+      )
+    )
+    const sentCount = results.filter((result) => result.status === 'fulfilled' && result.value.ok).length
+    if (sentCount > 0) {
+      toast({ title: 'Donors notified', description: `${sentCount} donor${sentCount === 1 ? '' : 's'} notified.` })
+    } else {
+      toast({ title: 'Notify failed', description: 'Could not send donor notifications.', variant: 'destructive' })
+    }
   }
 
   return (
@@ -325,17 +356,39 @@ export default function HospitalDashboard({ user }: HospitalDashboardProps) {
 
                       <DialogFooter>
                         <Button variant="outline" onClick={() => setShowQuickRequest(false)}>Cancel</Button>
-                        <Button onClick={() => {
+                        <Button onClick={async () => {
                           const bloodGroup = quickBloodGroup || 'O+'
-                          toast({ title: 'Quick request', description: `Blood request for ${bloodGroup} will be sent to donors in ${user.city || 'Karachi'}`, variant: 'default' })
-                          setShowQuickRequest(false)
+                          try {
+                            const res = await fetch('/api/blood-requests', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({
+                                bloodGroup,
+                                units: 1,
+                                urgency: 'urgent',
+                                city: user.city || 'Karachi',
+                                hospitalName: user.name,
+                                reason: 'Hospital quick request',
+                                contactNumber: '+923000000001',
+                              }),
+                            })
+                            const payload = await res.json().catch(() => ({}))
+                            if (!res.ok) throw new Error(payload.error || 'Quick request failed')
+                            toast({ title: 'Donors notified', description: `Blood request for ${bloodGroup} was sent to compatible donors.`, variant: 'default' })
+                            setShowQuickRequest(false)
+                            await loadHospitalData()
+                          } catch (error) {
+                            toast({ title: 'Request failed', description: error instanceof Error ? error.message : 'Could not notify donors.', variant: 'destructive' })
+                          }
                         }}>Send</Button>
                       </DialogFooter>
                     </DialogContent>
                   </Dialog>
                 </>
-                <Button variant="outline" className="gap-2 bg-transparent"><Send className="h-4 w-4" />Notify All Donors</Button>
-                <Button variant="outline" className="gap-2 bg-transparent"><FileText className="h-4 w-4" />Generate Report</Button>
+                <Button variant="outline" className="gap-2 bg-transparent" onClick={notifyAllDonors}>
+                  <Send className="h-4 w-4" />
+                  Notify All Donors
+                </Button>
               </div>
             </CardContent>
           </Card>
@@ -372,43 +425,40 @@ export default function HospitalDashboard({ user }: HospitalDashboardProps) {
                   Loading live hospital requests...
                 </div>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-border">
-                        <th className="text-left p-2 font-semibold">ID</th>
-                        <th className="text-left p-2 font-semibold">Patient</th>
-                        <th className="text-left p-2 font-semibold">Blood Type</th>
-                        <th className="text-left p-2 font-semibold">Units</th>
-                        <th className="text-left p-2 font-semibold">Urgency</th>
-                        <th className="text-left p-2 font-semibold">Status</th>
-                        <th className="text-left p-2 font-semibold">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredRequests.map(req => (
-                        <tr key={req.id} className="border-b border-border hover:bg-muted/50 transition-colors">
-                          <td className="p-2 font-mono text-xs">{req.id}</td>
-                          <td className="p-2">{req.patient}</td>
-                          <td className="p-2"><BloodBadge bloodType={req.blood} /></td>
-                          <td className="p-2">{req.units}</td>
-                          <td className="p-2">
+                <div className="grid gap-3">
+                  {filteredRequests.map((req) => (
+                    <div key={req.id} className="rounded-lg border border-border p-4">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="min-w-0 space-y-2">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="font-mono text-xs text-muted-foreground">{req.id}</span>
+                            <BloodBadge bloodType={req.blood} />
                             <span className={`px-2 py-1 rounded text-xs font-semibold border ${getUrgencyColor(req.urgency)}`}>
                               {req.urgency.charAt(0).toUpperCase() + req.urgency.slice(1)}
                             </span>
-                          </td>
-                          <td className="p-2">
-                            <span className={`px-2 py-1 rounded text-xs font-semibold ${getStatusColor(req.status)}`}>
-                              {req.status.charAt(0).toUpperCase() + req.status.slice(1)}
-                            </span>
-                          </td>
-                          <td className="p-2">
-                            <Button size="sm" variant="ghost"><Eye className="h-4 w-4" /></Button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                          </div>
+                          <p className="font-semibold">{req.patient}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {req.units} unit{req.units === 1 ? '' : 's'} needed in {req.ward}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className={`px-2 py-1 rounded text-xs font-semibold ${getStatusColor(req.status)}`}>
+                            {req.status.charAt(0).toUpperCase() + req.status.slice(1)}
+                          </span>
+                          <Button size="sm" variant="outline" className="gap-2 bg-transparent">
+                            <Eye className="h-4 w-4" />
+                            View
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  {filteredRequests.length === 0 && (
+                    <p className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
+                      No matching requests found.
+                    </p>
+                  )}
                 </div>
               )}
             </CardContent>

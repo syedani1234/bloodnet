@@ -1,5 +1,5 @@
-export const DB_PAKISTAN = process.env.MONGODB_DB || 'bloodnet'
-export const DB_KARACHI = process.env.MONGODB_KARACHI_DB || 'bloodnet_karachi'
+export const DB_PAKISTAN = process.env.MONGODB_DB || 'bloodnet1'
+export const DB_KARACHI = process.env.MONGODB_KARACHI_DB || 'bloodnet_karachi1'
 
 export const PAKISTANI_CITIES = [
   'Karachi',

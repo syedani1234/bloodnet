@@ -20,13 +20,10 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
   }
 
   const userId = auth.user._id.toString()
+  if (auth.user.role !== 'donor') {
+    return NextResponse.json({ error: 'Only donors can download donation certificates' }, { status: 403 })
+  }
   if (auth.user.role === 'donor' && donation.donorId !== userId) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
-  }
-  if (auth.user.role === 'receiver' && donation.recipientId !== userId) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
-  }
-  if (auth.user.role === 'hospital' && donation.hospitalId && donation.hospitalId !== userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
   }
 

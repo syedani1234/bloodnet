@@ -286,7 +286,7 @@ export default function DonationsPage() {
                     )}
 
                     {/* Certificate Display */}
-                    {(selectedDonation.status === 'completed' ||
+                    {user.role === 'donor' && (selectedDonation.status === 'completed' ||
                       selectedDonation.status === 'receipt_verified' ||
                       selectedDonation.status === 'verified') && (
                       <div>
@@ -323,7 +323,7 @@ export default function DonationsPage() {
                 {/* Sidebar */}
                 <div className="space-y-6">
                   {/* Certificate */}
-                  {selectedDonation.certificateGenerated && (
+                  {user.role === 'donor' && selectedDonation.certificateGenerated && (
                     <DonationCertificate donation={selectedDonation} />
                   )}
 

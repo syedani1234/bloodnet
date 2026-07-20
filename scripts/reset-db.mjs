@@ -4,8 +4,8 @@ import { seedDemoUsers } from './seed-demo-users.mjs'
 
 const uri = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017'
 const dbNames = Array.from(new Set([
-  process.env.MONGODB_DB || 'bloodnet',
-  process.env.MONGODB_KARACHI_DB || 'bloodnet_karachi',
+  process.env.MONGODB_DB || 'bloodnet1',
+  process.env.MONGODB_KARACHI_DB || 'bloodnet_karachi1',
 ]))
 
 async function main() {

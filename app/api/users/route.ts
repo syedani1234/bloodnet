@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
         ]
       }
 
-      const users = await db.collection<MongoUser>('users').find(filter).limit(200).toArray()
+      const users = await db.collection<MongoUser>('users').find(filter).sort({ createdAt: -1 }).limit(200).toArray()
       const normalizedUsers = users.map((user) => ({
         ...user,
         totalDonations: user.totalDonations ?? 0,
@@ -42,7 +42,14 @@ export async function GET(req: NextRequest) {
       allUsers.push(...normalizedUsers)
     }
 
-    const users = allUsers.map(mapMongoUserToAppUser)
+    const users = allUsers
+      .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
+      .map((user) => ({
+        ...mapMongoUserToAppUser(user),
+        createdAt: user.createdAt,
+        totalDonations: user.totalDonations ?? 0,
+        livesImpacted: user.livesImpacted ?? 0,
+      }))
 
     return NextResponse.json({
       users,

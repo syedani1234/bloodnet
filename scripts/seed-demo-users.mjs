@@ -4,7 +4,7 @@ import { MongoClient } from 'mongodb'
 import { pathToFileURL } from 'url'
 
 const uri = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017'
-const dbName = process.env.MONGODB_KARACHI_DB || 'bloodnet_karachi'
+const dbName = process.env.MONGODB_KARACHI_DB || 'bloodnet_karachi1'
 const defaultPassword = process.env.DEMO_USER_PASSWORD || 'StrongPass123'
 const adminEmail = (process.env.MONGODB_ADMIN_EMAIL || 'admin@bloodnet.dev').toLowerCase()
 const adminPassword = process.env.MONGODB_ADMIN_PASSWORD || 'Admin@123456'

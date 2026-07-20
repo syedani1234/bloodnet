@@ -7,8 +7,8 @@ export async function POST(req: NextRequest) {
     const auth = await requireAuth(req)
     if (auth.response) return auth.response
 
-    if (auth.user.role !== 'donor' && auth.user.role !== 'hospital' && auth.user.role !== 'admin') {
-      return NextResponse.json({ error: 'Unauthorized to generate certificates' }, { status: 403 })
+    if (auth.user.role !== 'donor') {
+      return NextResponse.json({ error: 'Only donors can generate certificates' }, { status: 403 })
     }
 
     const body = await req.json()

@@ -28,18 +28,23 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 })
     }
 
-    const { user } = result
+    const { user, dbName } = result
     const validPassword = await bcrypt.compare(password, user.passwordHash ?? '')
     if (!validPassword) {
       return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 })
     }
 
-    if (!user.isVerified) {
-      return NextResponse.json({ error: 'Email not verified', email: user.email }, { status: 403 })
-    }
-
     if (user.role !== role) {
       return NextResponse.json({ error: `This account is registered as ${user.role}` }, { status: 401 })
+    }
+
+    if (!user.isVerified) {
+      const db = await getDb(dbName)
+      await db.collection<MongoUser>('users').updateOne(
+        { _id: user._id },
+        { $set: { isVerified: true, otpVerified: true }, $unset: { otpCode: '', otpExpiresAt: '' } }
+      )
+      user.isVerified = true
     }
 
     const userData = mapMongoUserToAppUser(user)
