@@ -17,11 +17,18 @@ export interface User {
   profilePicture?: string
 }
 
+interface SignupResponse {
+  success: boolean
+  message: string
+  user?: User
+  error?: string
+}
+
 interface AuthContextType {
   user: User | null
   isLoading: boolean
   login: (email: string, password: string, role: UserRole) => Promise<void>
-  signup: (userData: Omit<User, 'id'> & { password: string }) => Promise<void>
+  signup: (userData: Omit<User, 'id'> & { password: string }) => Promise<SignupResponse>
   logout: () => void
 }
 
@@ -107,14 +114,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw new Error(data.error || 'Signup failed')
       }
 
-      const normalizedUser = {
-        ...data.user,
-        role: data.user?.role ?? 'donor',
-        city: data.user?.city ?? 'Karachi',
-        phone: data.user?.phone ?? '',
-      }
-      setUser(normalizedUser)
-      localStorage.setItem('bloodnet_user', JSON.stringify(normalizedUser))
+      return data as SignupResponse
     } catch (error) {
       throw error instanceof Error ? error : new Error('Signup failed. Please try again.')
     } finally {

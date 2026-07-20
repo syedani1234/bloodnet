@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -15,15 +15,66 @@ export default function VerifyPage() {
   const [code, setCode] = useState("")
   const [isVerifying, setIsVerifying] = useState(false)
   const [isVerified, setIsVerified] = useState(false)
+  const [error, setError] = useState('')
+  const [message, setMessage] = useState('')
 
-  const handleVerify = (e: React.FormEvent) => {
+  const [email, setEmail] = useState('')
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    setEmail(params.get('email') || '')
+  }, [])
+
+  const handleVerify = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsVerifying(true)
+    setError('')
+    setMessage('')
 
-    setTimeout(() => {
-      setIsVerified(true)
+    try {
+      const res = await fetch('/api/auth/otp/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, otp: code }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setError(data.error || 'Verification failed')
+      } else {
+        setIsVerified(true)
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Verification failed')
+    } finally {
       setIsVerifying(false)
-    }, 1000)
+    }
+  }
+
+  const handleResend = async () => {
+    if (!email) {
+      setError('Email missing for resend')
+      return
+    }
+    setIsVerifying(true)
+    setError('')
+    setMessage('')
+    try {
+      const res = await fetch('/api/auth/otp/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, name: '' }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setError(data.error || 'Failed to resend code')
+      } else {
+        setMessage('A new OTP code has been sent to your email.')
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to resend code')
+    } finally {
+      setIsVerifying(false)
+    }
   }
 
   if (isVerified) {
@@ -83,13 +134,20 @@ export default function VerifyPage() {
                 <p className="text-xs text-muted-foreground text-center">Check your email for the verification code</p>
               </div>
 
-              <Button type="submit" className="w-full" disabled={isVerifying || code.length !== 6}>
+              {error && (
+                <div className="rounded-md bg-red-50 p-3 text-sm text-red-700">{error}</div>
+              )}
+              {message && (
+                <div className="rounded-md bg-green-50 p-3 text-sm text-green-700">{message}</div>
+              )}
+
+              <Button type="submit" className="w-full" disabled={isVerifying || code.length !== 6 || !email}>
                 {isVerifying ? "Verifying..." : "Verify Email"}
               </Button>
 
               <p className="text-sm text-center text-muted-foreground">
                 Didn't receive a code?{" "}
-                <button type="button" className="text-primary hover:underline font-medium">
+                <button type="button" onClick={handleResend} className="text-primary hover:underline font-medium" disabled={isVerifying}>
                   Resend
                 </button>
               </p>

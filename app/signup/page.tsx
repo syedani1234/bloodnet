@@ -85,7 +85,7 @@ export default function SignupPage() {
     }
 
     try {
-      await signup({
+      const result = await signup({
         name: formData.name.trim(),
         email: formData.email.trim().toLowerCase(),
         password: formData.password,
@@ -94,7 +94,11 @@ export default function SignupPage() {
         city: city || 'Karachi',
         bloodGroup: bloodGroup || undefined,
       })
-      router.push('/dashboard')
+      if (result?.success) {
+        router.push(`/register/verify?email=${encodeURIComponent(formData.email.trim().toLowerCase())}`)
+      } else {
+        setError(result?.error || 'Signup failed. Please try again.')
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Signup failed. Please try again.')
     }
