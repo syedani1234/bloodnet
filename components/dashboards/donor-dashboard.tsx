@@ -526,7 +526,7 @@ export default function DonorDashboard({ user }: DonorDashboardProps) {
                           <Button
                             onClick={async () => {
                               try {
-                                const res = await fetch(`/api/donations/${donation.id}/certificate/download?city=${encodeURIComponent(user.city)}`)
+                                const res = await fetch(`/api/donations/${donation.id}/certificate/?city=${encodeURIComponent(user.city)}`)
                                 if (!res.ok) throw new Error('Failed to download certificate')
                                 const blob = await res.blob()
                                 const url = window.URL.createObjectURL(blob)
