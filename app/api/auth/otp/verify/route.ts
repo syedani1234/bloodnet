@@ -39,7 +39,10 @@ export async function POST(req: NextRequest) {
     }
 
     // Mark verified and clear otp fields
-    await users.updateOne({ _id: user._id }, { $set: { isVerified: true }, $unset: { otpCode: '', otpExpiresAt: '' } })
+    await users.updateOne(
+      { _id: user._id },
+      { $set: { isVerified: true, otpVerified: true }, $unset: { otpCode: '', otpExpiresAt: '' } }
+    )
 
     // Fetch updated user document for response
     const updatedUser = await users.findOne({ _id: user._id })

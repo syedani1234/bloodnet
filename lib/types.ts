@@ -16,6 +16,9 @@ export interface MongoUser {
   gender?: string
   dateOfBirth?: string
   isVerified?: boolean
+  otpCode?: string
+  otpExpiresAt?: string
+  otpVerified?: boolean
   lastDonationDate?: string
   nextEligibleDonationDate?: string
   eligibilityStatus?: EligibilityStatus

@@ -39,12 +39,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (!user.isVerified) {
-      const db = await getDb(dbName)
-      await db.collection<MongoUser>('users').updateOne(
-        { _id: user._id },
-        { $set: { isVerified: true, otpVerified: true }, $unset: { otpCode: '', otpExpiresAt: '' } }
-      )
-      user.isVerified = true
+      return NextResponse.json({ error: 'Email not verified. Please verify your email first.' }, { status: 401 })
     }
 
     const userData = mapMongoUserToAppUser(user)

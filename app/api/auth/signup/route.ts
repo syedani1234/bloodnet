@@ -4,7 +4,12 @@ import { getDbNameForCity } from '@/lib/db-config'
 import { getDb } from '@/lib/mongodb'
 import { mapMongoUserToAppUser } from '@/lib/mappers'
 import { normalizePakistaniPhone, validateSignupInput } from '@/lib/validation-utils'
+import { sendOtpEmail } from '@/lib/email'
 import type { AppRole } from '@/lib/types'
+
+function generateOtp() {
+  return Math.floor(100000 + Math.random() * 900000).toString()
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -36,6 +41,9 @@ export async function POST(req: NextRequest) {
     const passwordHash = await bcrypt.hash(String(password), 10)
     const now = new Date().toISOString()
 
+    const otpCode = generateOtp()
+    const otpExpiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString()
+
     const newUser = {
       name: String(name).trim(),
       email: normalizedEmail,
@@ -44,7 +52,10 @@ export async function POST(req: NextRequest) {
       role: role as AppRole,
       city: normalizedCity,
       bloodGroup: role === 'donor' || role === 'receiver' ? bloodGroup : undefined,
-      isVerified: true,
+      isVerified: false,
+      otpCode,
+      otpExpiresAt,
+      otpVerified: false,
       availability: role === 'donor' ? true : undefined,
       totalDonations: 0,
       livesImpacted: 0,
@@ -56,7 +67,10 @@ export async function POST(req: NextRequest) {
     const insertResult = await users.insertOne(newUser)
     const createdUser = { _id: insertResult.insertedId, ...newUser }
     const appUser = mapMongoUserToAppUser(createdUser as any)
-    return NextResponse.json({ success: true, message: 'Signup successful. You can log in now.', user: appUser }, { status: 201 })
+
+    await sendOtpEmail(normalizedEmail, otpCode, String(name).trim())
+
+    return NextResponse.json({ success: true, message: 'Signup successful. OTP sent to email.', user: appUser }, { status: 201 })
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Signup failed'
     return NextResponse.json({ error: message }, { status: 500 })
